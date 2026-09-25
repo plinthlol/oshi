@@ -6,7 +6,7 @@ GenericName=Text Editor
 Comment=Terminal text editor for UTF-8 text files
 # Terminal=false + rio wrapper on purpose: cosmic-files ignores Terminal=true
 # and Dolphin only ever uses konsole for it, so the Exec must be self-contained.
-Exec=rio -e Oshi %f
+Exec=rio -e oshi %f
 Icon=Oshi
 Terminal=false
 Categories=Utility;TextEditor;
