@@ -3378,8 +3378,8 @@ void editorApplyDefaultColors(void) {
   editorColorSet(COL_GUTTER_FG, 245);
   editorColorSet(COL_GUTTER_CURSOR_FG, 15); /* bright white */
   editorColorSet(COL_TILDE_FG, 245);
-  editorColorSet(COL_SCROLLMARK_BG, 15);  /* bright white */
-  editorColorSet(COL_SCROLLMARK_FG, 0);   /* black */
+  editorColorSet(COL_SCROLLMARK_BG, 244); /* dim gray, not bright white */
+  editorColorSet(COL_SCROLLMARK_FG, 232); /* near-black */
   /* text foreground and the gutter backgrounds are empty by default so they
    * follow the terminal's own theme (no panel behind the numbers unless you
    * ask for one); "color text/gutter_bg/gutter_cursor_bg <code>" opts in. */
