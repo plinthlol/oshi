@@ -4,11 +4,9 @@ Type=Application
 Name=Oshi
 GenericName=Text Editor
 Comment=Terminal text editor for UTF-8 text files
-# Terminal=false + rio wrapper on purpose: cosmic-files ignores Terminal=true
-# and Dolphin only ever uses konsole for it, so the Exec must be self-contained.
-Exec=rio -e oshi %f
+Exec=oshi %f
 Icon=Oshi
-Terminal=false
+Terminal=True
 Categories=Utility;TextEditor;
 Keywords=Text;UTF-8;UTF8;Editor;Terminal;
 MimeType=text/plain;text/markdown;text/x-python;text/x-csrc;text/x-c;text/x-shellscript;application/json;
