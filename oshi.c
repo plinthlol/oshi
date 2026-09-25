@@ -2180,11 +2180,11 @@ void editorDrawRows(struct abuf *ab) {
 void editorDrawStatusBar(struct abuf *ab) {
   abAppend(ab, E.col_str[COL_STATUS_BG], (int)strlen(E.col_str[COL_STATUS_BG]));
   abAppend(ab, E.col_str[COL_STATUS_FG], (int)strlen(E.col_str[COL_STATUS_FG]));
-  char name[160], left[512], right[96];
+  char name[512], left[1024], right[96];
+  char suffix[300]; /* what trails the name: dirty flag and/or a notice */
+  suffix[0] = '\0';
   const char *fn = E.filename ? E.filename : "[No Name]";
   int fnlen = (int)strlen(fn);
-  int skip = editorFitTail(fn, fnlen, 30); /* a long path shows its end */
-  snprintf(name, sizeof(name), "%s%s", skip > 0 ? "<" : "", fn + skip);
 
   int total = E.numrows > 0 ? E.numrows : 1;
   int cur = E.cy + 1 > total ? total : E.cy + 1;
@@ -2210,32 +2210,39 @@ void editorDrawStatusBar(struct abuf *ab) {
   int hasmsg = !quit_shown && !find_shown && !cfg_shown && E.statusmsg[0] &&
                (now - E.statusmsg_time < OSHI_STATUS_MS);
   long notice_t = -1; /* which notice this is, so editorReadKey can lapse it */
-  int len, rlen;
+  int len = 0, rlen = 0, slen = 0;
   if (prompt) {
-    len = snprintf(left, sizeof(left), "%s", E.statusmsg);
+    /* The name rides on the right while you type: keep its tail -- the
+     * basename -- and leave a margin on the bar for the prompt text. */
+    int cap = E.screencols - 24; /* margin left for the prompt text */
+    if (cap > 127) cap = 127;    /* widest UTF-8 spelling of name[], "<" included */
+    if (cap < 9) cap = 9;        /* "<" plus a toehold */
+    int skip = editorFitTail(fn, fnlen, cap - 1); /* -1: "<" costs a cell too */
+    snprintf(name, sizeof(name), "%s%s", skip > 0 ? "<" : "", fn + skip);
     rlen = snprintf(right, sizeof(right), "%s", name);
+    len = snprintf(left, sizeof(left), "%s", E.statusmsg);
   } else if (quit_shown) {
     char keyname[16];
     editorKeyName(E.binds[CMD_QUIT], keyname, sizeof(keyname));
-    len = snprintf(left, sizeof(left), "%s  Modified press %s again", name, keyname);
+    slen = snprintf(suffix, sizeof(suffix), "  Modified press %s again", keyname);
     rlen = snprintf(right, sizeof(right), "%d/%d", cur, E.rx + 1);
     notice_t = E.quit_time;
   } else if (find_shown) {
     int current, found = editorFindCount(&current);
-    len = snprintf(left, sizeof(left), "%s%s", name, E.dirty ? " (modified)" : "");
+    slen = snprintf(suffix, sizeof(suffix), "%s", E.dirty ? " (modified)" : "");
     rlen = snprintf(right, sizeof(right), "%d/%d", current, found);
     notice_t = find_time;
   } else if (cfg_shown) {
-    len = snprintf(left, sizeof(left), "%s  %s", name, E.config_err);
+    slen = snprintf(suffix, sizeof(suffix), "  %s", E.config_err);
     rlen = snprintf(right, sizeof(right), "%d/%d", cur, E.rx + 1);
     notice_t = E.config_err_time;
   } else if (hasmsg) {
-    len = snprintf(left, sizeof(left), "%s%s  %s", name,
-                   E.dirty ? " (modified)" : "", E.statusmsg);
+    slen = snprintf(suffix, sizeof(suffix), "%s  %s", E.dirty ? " (modified)" : "",
+                    E.statusmsg);
     rlen = snprintf(right, sizeof(right), "%d/%d", cur, E.rx + 1);
     notice_t = E.statusmsg_time;
   } else {
-    len = snprintf(left, sizeof(left), "%s%s", name, E.dirty ? " (modified)" : "");
+    slen = snprintf(suffix, sizeof(suffix), "%s", E.dirty ? " (modified)" : "");
     rlen = snprintf(right, sizeof(right), "%d/%d", cur, E.rx + 1);
   }
   if (notice_t >= 0) {
@@ -2245,6 +2252,7 @@ void editorDrawStatusBar(struct abuf *ab) {
     E.notice_pending = 0; /* a prompt, or a plain bar: nothing to lapse */
   }
   /* snprintf reports what it wanted to write, not what fit */
+  if (slen >= (int)sizeof(suffix)) slen = (int)sizeof(suffix) - 1;
   if (len >= (int)sizeof(left)) len = (int)sizeof(left) - 1;
   if (rlen >= (int)sizeof(right)) rlen = (int)sizeof(right) - 1;
 
@@ -2256,6 +2264,21 @@ void editorDrawStatusBar(struct abuf *ab) {
   int block = prompt && E.cursor_style == 2;
   int avail = E.screencols - rw - (block ? 1 : 0);
   if (avail < 0) avail = 0;
+  if (!prompt) {
+    /* The name gets everything the notice and the right side leave over, so a
+     * long path can use a wide bar instead of stopping at 30 columns. What it
+     * must give up it loses from the front ("<"), never the basename -- and
+     * that "<" gets a cell out of the budget, so the finished name (marker
+     * included) never overshoots. 16 is the floor under a long notice; 127 is
+     * the widest UTF-8 spelling that fits name[]. */
+    int budget = avail - editorStrWidth(suffix, slen);
+    if (budget < 16) budget = 16;
+    if (budget > 127) budget = 127;
+    int skip = editorFitTail(fn, fnlen, budget - 1); /* -1: "<" costs a cell too */
+    snprintf(name, sizeof(name), "%s%s", skip > 0 ? "<" : "", fn + skip);
+    len = snprintf(left, sizeof(left), "%s%s", name, suffix);
+    if (len >= (int)sizeof(left)) len = (int)sizeof(left) - 1;
+  }
   const char *lp = left;
   if (editorStrWidth(left, len) > avail) {
     if (prompt) { /* keep the end: that's where you are typing */
