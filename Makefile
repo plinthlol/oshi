@@ -21,8 +21,7 @@ all: oshi
 oshi: oshi.c
 	$(CC) oshi.c -o oshi -Wall -Wextra -pedantic $(if $(VERSION),-DOSHI_VERSION=\"$(VERSION)\")
 
-# install also drops leftovers from earlier naming rounds, then refreshes
-# the desktop + icon caches when those tools are around.
+# install refreshes the desktop + icon caches when those tools are around.
 install: oshi Oshi.desktop Oshi.svg
 	mkdir -p $(DESTDIR)$(BINDIR) \
 	  $(DESTDIR)$(SHAREDIR)/applications \
@@ -30,9 +29,6 @@ install: oshi Oshi.desktop Oshi.svg
 	install -m755 oshi $(DESTDIR)$(BINDIR)/oshi
 	install -m644 Oshi.desktop $(DESTDIR)$(SHAREDIR)/applications/Oshi.desktop
 	install -m644 Oshi.svg $(DESTDIR)$(SHAREDIR)/icons/hicolor/scalable/apps/Oshi.svg
-	rm -f $(DESTDIR)$(BINDIR)/Oshi \
-	  $(DESTDIR)$(SHAREDIR)/applications/oshi.desktop \
-	  $(DESTDIR)$(SHAREDIR)/icons/hicolor/scalable/apps/oshi.svg
 	@command -v update-desktop-database >/dev/null 2>&1 && \
 	  update-desktop-database $(DESTDIR)$(SHAREDIR)/applications 2>/dev/null; true
 	@command -v gtk-update-icon-cache >/dev/null 2>&1 && \
