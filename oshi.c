@@ -2337,7 +2337,7 @@ void editorRefreshScreen(void) {
        * cursor's own row is scrolled - editorScroll() always keeps E.rx
        * within one line of E.coloff, so E.coloff > 0 here means this row
        * has one. */
-      col = E.rx - E.coloff + E.gutter + 1 + (E.coloff > 0 ? 1 : 0);
+      col = E.rx - E.coloff + E.gutter + 1;
       if (col < 1) col = 1;
     }
     snprintf(buf, sizeof(buf), "\x1b[?25h\x1b[%d;%dH", row, col);
@@ -2522,10 +2522,17 @@ void editorMouse(int button, int release, int x, int y) {
   if (y < 1) y = 1;
   int filerow = y - 1 + E.rowoff;
 
-  if (button & 64) { /* wheel up / wheel down: three lines a notch */
+  if (button & 64) { /* wheel: up/down, or left/right (touchpad horizontal) */
+    int dir = button & 3; /* 0=up 1=down 2=left 3=right */
     int i;
-    for (i = 0; i < 3; i++)
-      editorMoveCursor((button & 1) ? ARROW_DOWN : ARROW_UP);
+    if (dir >= 2) {
+      for (i = 0; i < 3; i++)
+        editorMoveCursor(dir == 3 ? ARROW_RIGHT : ARROW_LEFT);
+      editorSyncGoal();
+    } else {
+      for (i = 0; i < 3; i++)
+        editorMoveCursor(dir == 1 ? ARROW_DOWN : ARROW_UP);
+    }
     return;
   }
   if ((button & 3) != 0) return; /* only the left button selects */
@@ -3176,8 +3183,8 @@ void editorMakeConfig(const char *path) {
     "color gutter_fg 245\n"
     "color gutter_cursor_fg 15\n"
     "color tilde_fg 245\n"
-    "color scrollmark_bg 15\n"
-    "color scrollmark_fg 0\n"
+    "color scrollmark_bg 244\n"
+    "color scrollmark_fg 232\n"
     "# colorscheme default    resets every color above\n"
     "\n"
     "# bind <key> <command>   move a command to a different key, e.g:\n"
