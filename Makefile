@@ -14,22 +14,41 @@ BINDIR ?= $(HOME)/.local/bin
 SHAREDIR ?= $(HOME)/.local/share
 endif
 
-oshi: oshi.c
-	$(CC) oshi.c -o oshi -Wall -Wextra -pedantic $(if $(VERSION),-DOSHI_VERSION=\"$(VERSION)\")
+# install also removes leftovers from the old lowercase naming (oshi,
+# oshi.desktop, oshi.svg), and refreshes the desktop + icon caches when
+# the tools are around.
 
-install: oshi oshi.desktop
-	mkdir -p $(DESTDIR)$(BINDIR) $(DESTDIR)$(SHAREDIR)/applications
-	install -m755 oshi $(DESTDIR)$(BINDIR)/oshi
-	install -m644 oshi.desktop $(DESTDIR)$(SHAREDIR)/applications/oshi.desktop
+Oshi: oshi.c
+	$(CC) oshi.c -o Oshi -Wall -Wextra -pedantic $(if $(VERSION),-DOSHI_VERSION=\"$(VERSION)\")
+
+install: Oshi Oshi.desktop Oshi.svg
+	mkdir -p $(DESTDIR)$(BINDIR) \
+	  $(DESTDIR)$(SHAREDIR)/applications \
+	  $(DESTDIR)$(SHAREDIR)/icons/hicolor/scalable/apps
+	install -m755 Oshi $(DESTDIR)$(BINDIR)/Oshi
+	install -m644 Oshi.desktop $(DESTDIR)$(SHAREDIR)/applications/Oshi.desktop
+	install -m644 Oshi.svg $(DESTDIR)$(SHAREDIR)/icons/hicolor/scalable/apps/Oshi.svg
+	rm -f $(DESTDIR)$(BINDIR)/oshi \
+	  $(DESTDIR)$(SHAREDIR)/applications/oshi.desktop \
+	  $(DESTDIR)$(SHAREDIR)/icons/hicolor/scalable/apps/oshi.svg
 	@command -v update-desktop-database >/dev/null 2>&1 && \
 	  update-desktop-database $(DESTDIR)$(SHAREDIR)/applications 2>/dev/null; true
+	@command -v gtk-update-icon-cache >/dev/null 2>&1 && \
+	  gtk-update-icon-cache -f -t $(DESTDIR)$(SHAREDIR)/icons/hicolor 2>/dev/null; true
 
 uninstall:
-	rm -f $(DESTDIR)$(BINDIR)/oshi $(DESTDIR)$(SHAREDIR)/applications/oshi.desktop
+	rm -f $(DESTDIR)$(BINDIR)/Oshi \
+	  $(DESTDIR)$(SHAREDIR)/applications/Oshi.desktop \
+	  $(DESTDIR)$(SHAREDIR)/icons/hicolor/scalable/apps/Oshi.svg \
+	  $(DESTDIR)$(BINDIR)/oshi \
+	  $(DESTDIR)$(SHAREDIR)/applications/oshi.desktop \
+	  $(DESTDIR)$(SHAREDIR)/icons/hicolor/scalable/apps/oshi.svg
 	@command -v update-desktop-database >/dev/null 2>&1 && \
 	  update-desktop-database $(DESTDIR)$(SHAREDIR)/applications 2>/dev/null; true
+	@command -v gtk-update-icon-cache >/dev/null 2>&1 && \
+	  gtk-update-icon-cache -f -t $(DESTDIR)$(SHAREDIR)/icons/hicolor 2>/dev/null; true
 
 clean:
-	rm -f oshi
+	rm -f Oshi oshi
 
 .PHONY: clean install uninstall

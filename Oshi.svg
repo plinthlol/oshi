@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- oshi - terminal text editor icon -->
+  <!-- pure geometry, no fonts: renders identically everywhere -->
+  <rect width="128" height="128" rx="27" fill="#17191d"/>
+  <rect x="0.75" y="0.75" width="126.5" height="126.5" rx="26.25"
+        fill="none" stroke="#33383f" stroke-width="1.5"/>
+
+  <!-- shell prompt chevron -->
+  <path d="M 34 38 L 56 54 L 34 70"
+        fill="none" stroke="#7fa563" stroke-width="11"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- line of text after the prompt -->
+  <rect x="66" y="48" width="38" height="12" rx="6" fill="#454c56"/>
+
+  <!-- second line of text -->
+  <rect x="30" y="82" width="38" height="12" rx="6" fill="#454c56"/>
+
+  <!-- block cursor, mid-edit -->
+  <rect x="80" y="78" width="16" height="20" rx="4" fill="#d7d7d7"/>
+</svg>
