@@ -4,8 +4,8 @@
   <rect x="0.5" y="0.5" width="127" height="127" rx="29.5"
         fill="none" stroke="#2a2e35" stroke-width="1"/>
 
-  <!-- drop shadow (soft, behind the mark) -->
-  <rect x="34" y="42" width="60" height="60" rx="16" fill="#2a2e35"/>
-  <!-- the mark itself: one calm accent -->
-  <rect x="30" y="38" width="60" height="60" rx="16" fill="#66b2b2"/>
+  <!-- drop shadow (soft, behind the centered mark) -->
+  <rect x="36" y="36" width="60" height="60" rx="16" fill="#2a2e35"/>
+  <!-- the mark itself: one calm accent, dead center -->
+  <rect x="34" y="34" width="60" height="60" rx="16" fill="#66b2b2"/>
 </svg>
