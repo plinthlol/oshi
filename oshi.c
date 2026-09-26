@@ -2162,11 +2162,10 @@ static void editorDrawRowText(struct abuf *ab, erow *row, int filerow, int avail
       on_cur = block && b == E.cx;
       in_match = qlen && m && b >= (m - row->chars) &&
                  b < (m - row->chars) + qlen;
-      rev = in_sel || on_cur;
+      rev = in_sel || on_cur || in_match; /* match, selection: one white block */
       if (rev && col + w >= right) hit_right = 1; /* cursor/selection on the '> cell */
 
       if (rev) abAppend(ab, "\x1b[7m", 4);
-      else if (in_match) abAppend(ab, E.col_str[COL_FIND], (int)strlen(E.col_str[COL_FIND]));
 
       if (row->chars[b] == '\t' || col < left || col + w > right) {
         /* a tab, or a wide character cut by the edge: paint just the cells
@@ -2187,14 +2186,7 @@ static void editorDrawRowText(struct abuf *ab, erow *row, int filerow, int avail
         else
           abAppend(ab, row->chars + b, e - b);
       }
-
       if (rev) abAppend(ab, "\x1b[27m", 5); /* reverse: reverse off */
-      else if (in_match) {                    /* search match: restore the fg */
-        if (E.col_str[COL_TEXT_FG][0])
-          abAppend(ab, E.col_str[COL_TEXT_FG], (int)strlen(E.col_str[COL_TEXT_FG]));
-        else
-          abAppend(ab, "\x1b[39m", 5); /* text fg was unset: reset to default */
-      }
     }
     col += w;
     b = e;
@@ -3076,11 +3068,12 @@ void editorProcessKeypress(void) {
     return;
   }
 
-  /* Any non-command key means you're done browsing the results and back to
-   * editing: drop the live search so its "cur/total" counter and underlines
-   * don't linger over your typing. n/N/help/save stay in search mode because
-   * they're commands above. */
-  if (find_on && !(c == MOUSE_KEY && (E.mouse_button & 64))) { /* (the wheel just scrolls) */
+  /* Only Esc drops the live search: its highlights and "cur/total" counter
+   * linger so you can see where you are as you move through matches. Cursor
+   * movement and selection don't clear it -- n/N/help/save stay in search
+   * mode (they're commands above). Ctrl-F starts a fresh search. Mouse wheel
+   * scrolls the view without touching the search. */
+  if (c == '\x1b' && find_on) { /* Esc: clear the live search + highlights */
     find_on = 0;
     find_q[0] = '\0';
     find_row = -1;
