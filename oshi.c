@@ -98,10 +98,11 @@ enum editorColor {
   COL_TEXT_FG,         /* buffer text foreground             */
   COL_SCROLLMARK_BG,   /* the < / > "more this way" marks    */
   COL_SCROLLMARK_FG,
+  COL_FIND,             /* the live search match highlight   */
   COL_COUNT
 };
 
-static int colIsFg[COL_COUNT] = { 0, 1, 1, 1, 0, 0, 1, 1, 0, 1 };
+static int colIsFg[COL_COUNT] = { 0, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1 };
 
 /*** data ***/
 
@@ -1619,26 +1620,84 @@ void editorCut(void) {
   else editorDeleteSelection();
 }
 
-/* ctrl-v: what oshi last copied or cut. (Text copied elsewhere goes in with
- * the terminal's own paste, which arrives as a bracketed paste.) */
-void editorPasteInternal(void) {
-  if (E.clip == NULL || E.clip_len == 0) {
-    editorSetStatusMessage("Nothing to paste");
-    return;
+/* Read the terminal's clipboard with the usual tools, for ctrl-v when oshi
+ * doesn't already hold a copy: wl-paste (Wayland), xclip/xsel (X11), pbcopy (
+ * macOS)... err, pbpaste (macOS), clip / powershell Get-Clipboard (WSL). Like
+ * editorClipboardExternal, this runs on the alt screen, so stderr is thrown
+ * away: "command not found" or a missing daemon must not paint on the frame.
+ * Returns malloc'd text (no NUL terminator counted) or NULL. */
+static char *editorClipboardRead(int *len) {
+  static const char *cmds[] = {
+    "wl-paste",
+    "xclip -selection clipboard -o",
+    "xsel --clipboard --output",
+    "pbpaste",
+    "powershell.exe -NoProfile -Command \"Get-Clipboard -Raw\"",
+    NULL
+  };
+  int i;
+  for (i = 0; cmds[i]; i++) {
+    char cmd[160];
+    snprintf(cmd, sizeof(cmd), "%s 2>/dev/null", cmds[i]);
+    FILE *fp = popen(cmd, "r");
+    if (!fp) continue;
+    size_t have = 0, cap = 4096;
+    char *out = xmalloc(cap + 1);
+    while (1) {
+      size_t n;
+      if (have + 512 > cap) {
+        cap = have + 4096;
+        out = xrealloc(out, cap + 1);
+      }
+      n = fread(out + have, 1, cap - have, fp);
+      have += n;
+      if (n < cap - have) break; /* EOF or error: we're done */
+    }
+    out[have] = '\0';
+    int rc = pclose(fp);
+    if (rc == 0 && have > 0) { *len = (int)have; return out; }
+    free(out);
   }
+  *len = 0;
+  return NULL;
+}
+
+/* ctrl-v: what oshi last copied or cut. When that's empty, fall back to the
+ * system clipboard -- so a copy from outside the editor still pastes. (A paste
+ * made through the terminal's own bracketed paste still arrives as PASTE_KEY
+ * and bypasses this.) */
+void editorPasteInternal(void) {
+  char *text = E.clip;
+  int len = E.clip_len;
+  int isline = E.clip_line;
+  int free_text = 0;
+
+  if (text == NULL || len == 0) {
+    text = editorClipboardRead(&len);
+    free_text = 1; /* only our own malloc'd buffer, not E.clip */
+    if (text == NULL || len == 0) {
+      editorSetStatusMessage("Nothing to paste");
+      free(text);
+      return;
+    }
+    isline = 0; /* external text is not a "whole line" cut -- paste in-line */
+  }
+
   /* Same wording and line count as copy/cut use: the whole clip, newline and all */
-  int n = editorLineCount(E.clip, E.clip_len);
-  if (E.clip_line && !E.sel) { /* a whole line goes in above this one */
+  int n = editorLineCount(text, len);
+  if (isline && !E.sel) { /* a whole line goes in above this one */
     int at = E.cy < E.numrows ? E.cy : 0;
     int had_rows = E.numrows > 0;
     editorUndoBegin(at, 0);
-    editorInsertRow(at, E.clip, E.clip_len - 1);
+    editorInsertRow(at, text, len - 1);
     if (had_rows) E.cy++; /* the cursor stays on the line it was on */
     editorUndoCommit();
   } else {
-    editorInsertText(E.clip, E.clip_len);
+    editorInsertText(text, len);
   }
   editorSetStatusMessage("Pasted %d line%s", n, n == 1 ? "" : "s");
+  if (free_text) free(text); /* external clipboard text was malloc'd here;
+                              internal clip lives in E.clip, not ours to free */
 }
 
 /*** find ***/
@@ -2094,7 +2153,7 @@ static void editorDrawRowText(struct abuf *ab, erow *row, int filerow, int avail
       rev = in_sel || on_cur;
 
       if (rev) abAppend(ab, "\x1b[7m", 4);
-      else if (in_match) abAppend(ab, "\x1b[4m", 4);
+      else if (in_match) abAppend(ab, E.col_str[COL_FIND], (int)strlen(E.col_str[COL_FIND]));
 
       if (row->chars[b] == '\t' || col < left || col + w > right) {
         /* a tab, or a wide character cut by the edge: paint just the cells
@@ -2116,8 +2175,13 @@ static void editorDrawRowText(struct abuf *ab, erow *row, int filerow, int avail
           abAppend(ab, row->chars + b, e - b);
       }
 
-      if (rev) abAppend(ab, "\x1b[27m", 5);
-      else if (in_match) abAppend(ab, "\x1b[24m", 5);
+      if (rev) abAppend(ab, "\x1b[27m", 5); /* reverse: reverse off */
+      else if (in_match) {                    /* search match: restore the fg */
+        if (E.col_str[COL_TEXT_FG][0])
+          abAppend(ab, E.col_str[COL_TEXT_FG], (int)strlen(E.col_str[COL_TEXT_FG]));
+        else
+          abAppend(ab, "\x1b[39m", 5); /* text fg was unset: reset to default */
+      }
     }
     col += w;
     b = e;
@@ -3175,7 +3239,7 @@ void editorMakeConfig(const char *path) {
     "\n"
     "# color <role> <code>   256-color palette code, 0-255\n"
     "# roles: status_bg status_fg gutter_fg gutter_cursor_fg gutter_bg\n"
-    "#        gutter_cursor_bg tilde_fg text scrollmark_bg scrollmark_fg\n"
+    "#        gutter_cursor_bg tilde_fg text scrollmark_bg scrollmark_fg find\n"
     "# text, gutter_bg and gutter_cursor_bg are unset here - they follow the\n"
     "# terminal's own colors until you set them.\n"
     "color status_bg 245\n"
@@ -3380,6 +3444,7 @@ void editorApplyDefaultColors(void) {
   editorColorSet(COL_TILDE_FG, 245);
   editorColorSet(COL_SCROLLMARK_BG, 244); /* dim gray, not bright white */
   editorColorSet(COL_SCROLLMARK_FG, 232); /* near-black */
+  editorColorSet(COL_FIND, 121); /* vivid green: search hits must read on any bg */
   /* text foreground and the gutter backgrounds are empty by default so they
    * follow the terminal's own theme (no panel behind the numbers unless you
    * ask for one); "color text/gutter_bg/gutter_cursor_bg <code>" opts in. */
@@ -3399,6 +3464,7 @@ int editorParseColorRole(const char *name) {
   if (!strcmp(name, "text")) return COL_TEXT_FG;
   if (!strcmp(name, "scrollmark_bg")) return COL_SCROLLMARK_BG;
   if (!strcmp(name, "scrollmark_fg")) return COL_SCROLLMARK_FG;
+  if (!strcmp(name, "find")) return COL_FIND;
   return -1;
 }
 
