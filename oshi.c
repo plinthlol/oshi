@@ -98,11 +98,11 @@ enum editorColor {
   COL_TEXT_FG,         /* buffer text foreground             */
   COL_SCROLLMARK_BG,   /* the < / > "more this way" marks    */
   COL_SCROLLMARK_FG,
-  COL_FIND,             /* the live search match highlight   */
+  COL_FIND,             /* yellow background behind find hits  */
   COL_COUNT
 };
 
-static int colIsFg[COL_COUNT] = { 0, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1 };
+static int colIsFg[COL_COUNT] = { 0, 1, 1, 1, 0, 0, 1, 1, 0, 1, 0 };
 
 /*** data ***/
 
@@ -2162,9 +2162,12 @@ static void editorDrawRowText(struct abuf *ab, erow *row, int filerow, int avail
       on_cur = block && b == E.cx;
       in_match = qlen && m && b >= (m - row->chars) &&
                  b < (m - row->chars) + qlen;
-      rev = in_sel || on_cur || in_match; /* match, selection: one white block */
+      rev = in_sel || on_cur; /* selection/cursor: reverse block */
+      int hl = in_match && !rev; /* find hit: yellow bg (selection wins) */
       if (rev && col + w >= right) hit_right = 1; /* cursor/selection on the '> cell */
 
+      if (hl && E.col_str[COL_FIND][0])
+        abAppend(ab, E.col_str[COL_FIND], (int)strlen(E.col_str[COL_FIND]));
       if (rev) abAppend(ab, "\x1b[7m", 4);
 
       if (row->chars[b] == '\t' || col < left || col + w > right) {
@@ -2187,6 +2190,7 @@ static void editorDrawRowText(struct abuf *ab, erow *row, int filerow, int avail
           abAppend(ab, row->chars + b, e - b);
       }
       if (rev) abAppend(ab, "\x1b[27m", 5); /* reverse: reverse off */
+      if (hl) abAppend(ab, "\x1b[49m", 5); /* back to the terminal's own bg */
     }
     col += w;
     b = e;
@@ -2236,8 +2240,8 @@ void editorDrawRows(struct abuf *ab) {
       abAppend(ab, "\x1b[0m", 4);
     }
     /* text color is set once for the whole line; the plain cells inherit it,
-     * the reverse-video cells (cursor + selection) invert it, and find-hits
-     * underline it. */
+     * the reverse-video cells (cursor + selection) invert it, and find hits
+     * sit on a yellow background. */
     abAppend(ab, E.col_str[COL_TEXT_FG], (int)strlen(E.col_str[COL_TEXT_FG]));
     editorDrawRowText(ab, filerow < E.numrows ? &E.row[filerow] : &blank,
                       filerow, avail);
@@ -3451,7 +3455,7 @@ void editorApplyDefaultColors(void) {
   editorColorSet(COL_TILDE_FG, 245);
   editorColorSet(COL_SCROLLMARK_BG, 244); /* dim gray, not bright white */
   editorColorSet(COL_SCROLLMARK_FG, 232); /* near-black */
-  editorColorSet(COL_FIND, 121); /* vivid green: search hits must read on any bg */
+  editorColorSet(COL_FIND, 100); /* dark olive-yellow: readable text on it */
   /* text foreground and the gutter backgrounds are empty by default so they
    * follow the terminal's own theme (no panel behind the numbers unless you
    * ask for one); "color text/gutter_bg/gutter_cursor_bg <code>" opts in. */
