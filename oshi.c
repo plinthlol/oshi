@@ -2104,7 +2104,15 @@ void editorDrawCursorCell(struct abuf *ab, char ch) {
  * itself, so the actual text is drawn one narrower on that side. Drawn as a
  * highlighted chip (its own background color) so it reads as a UI mark
  * rather than as more buffer text. */
-static void editorDrawScrollMark(struct abuf *ab, char mark) {
+static void editorDrawScrollMark(struct abuf *ab, char mark, int covered) {
+  if (covered) {
+    /* the cursor or a selection reaches this edge, so the mark would sit
+     * under/beside the block cursor. drawing it in reverse would glow again
+     * (reverse of the default fg is bright), undoing the dim -- so just let
+     * the cursor cover it instead. (find matches reverse-highlight too, but
+     * they're never adjacent to the edge mark, so they need nothing here.) */
+    return;
+  }
   abAppend(ab, E.col_str[COL_SCROLLMARK_BG],
            (int)strlen(E.col_str[COL_SCROLLMARK_BG]));
   abAppend(ab, E.col_str[COL_SCROLLMARK_FG],
@@ -2135,8 +2143,12 @@ static void editorDrawRowText(struct abuf *ab, erow *row, int filerow, int avail
   int right = E.coloff + avail - (has_right ? 1 : 0); /* one past the last */
   if (right < left) right = left;
   int col = 0, b = 0;
+  int hit_right = 0; /* does the selection/cursor reach the '>' mark's cell? */
+  int firstvis_cx = editorRowRxToCx(row, E.coloff); /* byte of first shown char */
 
-  if (has_left) editorDrawScrollMark(ab, '<');
+  if (has_left) editorDrawScrollMark(ab, '<',
+    (filerow == E.cy && E.rx == E.coloff) ||
+    (sel_on && sel_from <= firstvis_cx && sel_to > firstvis_cx));
 
   while (b < row->size) {
     int e = editorCharEnd(row, b);
@@ -2151,6 +2163,7 @@ static void editorDrawRowText(struct abuf *ab, erow *row, int filerow, int avail
       in_match = qlen && m && b >= (m - row->chars) &&
                  b < (m - row->chars) + qlen;
       rev = in_sel || on_cur;
+      if (rev && col + w >= right) hit_right = 1; /* cursor/selection on the '> cell */
 
       if (rev) abAppend(ab, "\x1b[7m", 4);
       else if (in_match) abAppend(ab, E.col_str[COL_FIND], (int)strlen(E.col_str[COL_FIND]));
@@ -2192,7 +2205,8 @@ static void editorDrawRowText(struct abuf *ab, erow *row, int filerow, int avail
   if ((sel_eol || (block && E.cx >= row->size)) && col >= left && col < right)
     editorDrawCursorCell(ab, ' ');
 
-  if (has_right) editorDrawScrollMark(ab, '>');
+  if (has_right) editorDrawScrollMark(ab, '>',
+    hit_right || ((sel_eol || (block && E.cx >= row->size)) && col >= right - 1 && col < right));
 }
 
 void editorDrawRows(struct abuf *ab) {
