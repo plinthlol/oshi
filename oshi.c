@@ -2162,10 +2162,16 @@ static void editorDrawRowText(struct abuf *ab, erow *row, int filerow, int avail
       on_cur = block && b == E.cx;
       in_match = qlen && m && b >= (m - row->chars) &&
                  b < (m - row->chars) + qlen;
-      rev = in_sel || on_cur || in_match; /* match, selection: one white block */
+      rev = in_sel || on_cur;                /* cursor/selection: reverse block */
       if (rev && col + w >= right) hit_right = 1; /* cursor/selection on the '> cell */
 
-      if (rev) abAppend(ab, "\x1b[7m", 4);
+      /* find matches: a yellow highlight (visible on any background). a match
+       * under the block cursor keeps the cursor's reverse, which draws over
+       * the yellow. < and > covered by the cursor still use plain reverse. */
+      if (in_match)
+        abAppend(ab, "\x1b[48;5;226m", 9);   /* yellow background */
+      if (rev)
+        abAppend(ab, "\x1b[7m", 4);
 
       if (row->chars[b] == '\t' || col < left || col + w > right) {
         /* a tab, or a wide character cut by the edge: paint just the cells
@@ -2187,6 +2193,7 @@ static void editorDrawRowText(struct abuf *ab, erow *row, int filerow, int avail
           abAppend(ab, row->chars + b, e - b);
       }
       if (rev) abAppend(ab, "\x1b[27m", 5); /* reverse: reverse off */
+      if (in_match) abAppend(ab, "\x1b[49m", 5); /* yellow bg: off (restores default bg, keeps fg) */
     }
     col += w;
     b = e;
